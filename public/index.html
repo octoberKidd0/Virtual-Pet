@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Virtual Pet</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div class="container">
+            <h1>🐾 Virtual Pet</h1>
+            <div id="pet-status">
+                <div id="pet-display">🐶</div>
+                <h2 id="pet-name"></h2>
+                <div class="stats">
+                    <div>Hunger: <span id="hunger"></span></div>
+                    <div>Happiness: <span id="happiness"></span></div>
+                    <div>Energy: <span id="energy"></span></div>
+                </div>
+                <div id="status-message"></div>
+            </div>
+            <div class="controls">
+                <button onclick="feed()">Feed 🥩</button>
+                <button onclick="play()">Play 🎾</button>
+                <button onclick="sleep()">Sleep 🛏️</button>
+                <button onclick="resetPet()">Reset 🔄</button>
+            </div>
+        </div>
+        <script src="script.js"></script>
+    </body>
+</html>
