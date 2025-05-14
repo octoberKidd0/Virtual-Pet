@@ -1,11 +1,41 @@
 body {
   font-family: Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
   background: #f0f0f0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  min-height: 100vh;
-  margin: 0;
+}
+
+.auth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.hidden {
+  display: none !important;
+}
+
+#logout-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#logout-button:hover {
+  background: #cc0000;
 }
 
 .container {
@@ -13,7 +43,9 @@ body {
   padding: 2rem;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  text-align: center;
+  width: 90%;
+  max-width: 600px;
+  margin-top: 60px;
 }
 
 #pet-display {
@@ -30,24 +62,45 @@ body {
 
 .controls {
   margin-top: 1rem;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 button {
   padding: 0.5rem 1rem;
-  margin: 0.3rem;
   border: none;
   border-radius: 5px;
   background: #4CAF50;
   color: white;
   cursor: pointer;
+  transition: background 0.3s;
 }
 
 button:hover {
   background: #45a049;
 }
 
+button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+#reset-button {
+  background: #ff9800;
+}
+
+#reset-button:hover {
+  background: #f57c00;
+}
+
+.achievements {
+  margin-top: 2rem;
+  text-align: left;
+}
+
 #status-message {
-  color: #666;
   margin-top: 1rem;
-  min-height: 1.5rem;
+  min-height: 1.5em;
 }

@@ -5,9 +5,17 @@
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <div class="container">
-            <h1>🐾 Virtual Pet</h1>
-            <div id="pet-status">
+        <div class="auth-buttons">
+            <button onclick="login()">Login</button>
+            <button onclick="register()">Register</button>
+        </div>
+
+        <button id="logout-button" class="hidden" onclick="logout()">
+            Logout
+        </button>
+
+        <div class="container hidden">
+            <div class="pet-status">
                 <div id="pet-display">🐶</div>
                 <h2 id="pet-name"></h2>
                 <div class="stats">
@@ -17,11 +25,17 @@
                 </div>
                 <div id="status-message"></div>
             </div>
+
             <div class="controls">
                 <button onclick="feed()">Feed 🥩</button>
                 <button onclick="play()">Play 🎾</button>
                 <button onclick="sleep()">Sleep 🛏️</button>
-                <button onclick="resetPet()">Reset 🔄</button>
+                <button id="reset-button" onclick="resetPet()">Reset 🔄</button>
+            </div>
+
+            <div class="achievements">
+                <h3>Achievements</h3>
+                <ul id="achievements-list"></ul>
             </div>
         </div>
         <script src="script.js"></script>

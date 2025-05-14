@@ -1,130 +1,172 @@
+let currentUser = null;
+let petState = null;
 const API_BASE = "/api";
-let isOnline = true;
-let retryCount = 0;
 
-async function checkConnection() {
+async function register() {
+    const username = prompt("Enter username:");
+    const password = prompt("Enter password:");
+    if (!username || !password) return;
+
     try {
-        const response = await fetch("/health");
-        return response.ok;
-    } catch {
-        return false;
+        const response = await fetch(`${API_BASE}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
+
+        if (response.ok) {
+            alert("Registration successful! Please login.");
+            login();
+        } else {
+            const error = await response.json();
+            alert(error.error || "Registration failed");
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Connection error");
     }
 }
 
-async function networkRetry(fn, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            isOnline = await checkConnection();
-            if (!isOnline) throw new Error("Offline");
-            return await fn();
-        } catch (error) {
-            if (attempt === maxRetries) throw error;
-            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-            console.log(`Retry attempt ${attempt}`);
+async function login() {
+    const username = prompt("Enter username:");
+    const password = prompt("Enter password:");
+    if (!username || !password) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
+
+        if (response.ok) {
+            const { token, pet } = await response.json();
+            localStorage.setItem("token", token);
+            currentUser = username;
+            petState = pet;
+            updateUI();
+        } else {
+            const error = await response.json();
+            alert(error.error || "Login failed");
         }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Connection error");
     }
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    currentUser = null;
+    petState = null;
+    updateUI();
 }
 
 async function updateStatus() {
+    if (!currentUser) return;
+
     try {
-        await networkRetry(async () => {
-            const response = await fetch(`${API_BASE}/pet`);
-            if (!response.ok) throw new Error("Server error");
-
-            const newState = await response.json();
-            petState = { ...newState };
-
-            updateDisplay();
-            return true;
+        const response = await fetch(`${API_BASE}/pet`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
         });
 
-        retryCount = 0;
+        if (response.ok) {
+            petState = await response.json();
+            updateUI();
+        }
     } catch (error) {
-        handleNetworkError(error);
+        console.error("Error:", error);
     }
-}
-
-function updateDisplay() {
-    document.getElementById("pet-name").textContent = petState.name;
-    document.getElementById("hunger").textContent = petState.hunger;
-    document.getElementById("happiness").textContent = petState.happiness;
-    document.getElementById("energy").textContent = petState.energy;
-
-    const statusMessage = document.getElementById("status-message");
-    statusMessage.textContent = petState.isAlive
-        ? getMoodMessage()
-        : "Your pet has passed away 💔";
-    statusMessage.style.color = petState.isAlive ? "#666" : "red";
-
-    disableButtons(!petState.isAlive);
-}
-
-function getMoodMessage() {
-    if (petState.hunger > 80) return "I'm starving!";
-    if (petState.happiness < 20) return "I'm so lonely...";
-    if (petState.energy < 20) return "I need to sleep...";
-    if (petState.happiness > 80) return "I love you!";
-    return "I'm feeling okay!";
 }
 
 async function sendAction(action) {
+    if (!currentUser) return;
+    if (petState && !petState.isAlive && action !== "reset") return;
+
     try {
-        showMessage("Processing...", "blue");
-        disableButtons(true);
-
-        await networkRetry(async () => {
-            const response = await fetch(`${API_BASE}/${action}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-            });
-
-            if (!response.ok) throw new Error("Action failed");
-            await updateStatus();
-            showMessage("Action successful!", "green", 2000);
+        const response = await fetch(`${API_BASE}/${action}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
         });
+
+        if (response.ok) {
+            petState = await response.json();
+            updateUI();
+        }
     } catch (error) {
-        showMessage(`Failed: ${error.message}`, "orange");
-    } finally {
-        disableButtons(false);
+        console.error("Error:", error);
     }
 }
 
-function showMessage(text, color, duration = 3000) {
-    const statusMessage = document.getElementById("status-message");
-    statusMessage.textContent = text;
-    statusMessage.style.color = color;
-    if (duration) setTimeout(() => (statusMessage.textContent = ""), duration);
-}
+function updateUI() {
+    const authButtons = document.querySelector(".auth-buttons");
+    const logoutButton = document.getElementById("logout-button");
+    const container = document.querySelector(".container");
 
-function disableButtons(disabled) {
-    document.querySelectorAll("button").forEach((button) => {
-        button.disabled = disabled || !petState.isAlive;
-    });
-}
+    if (currentUser && petState) {
+        authButtons.classList.add("hidden");
+        logoutButton.classList.remove("hidden");
+        container.classList.remove("hidden");
 
-function handleNetworkError(error) {
-    console.error("Network error:", error);
-    retryCount++;
+        document.getElementById("pet-name").textContent = petState.name;
+        document.getElementById("hunger").textContent = petState.hunger;
+        document.getElementById("happiness").textContent = petState.happiness;
+        document.getElementById("energy").textContent = petState.energy;
 
-    if (retryCount > 3) {
-        showMessage("Severe connection issues - please refresh", "red");
-        disableButtons(true);
+        const statusMessage = document.getElementById("status-message");
+        statusMessage.textContent = petState.isAlive
+            ? getMoodMessage(petState)
+            : "Your pet has passed away 💔";
+        statusMessage.style.color = petState.isAlive ? "#666" : "red";
+
+        document.getElementById("achievements-list").innerHTML =
+            petState.achievements.unlocked.map((a) => `<li>${a}</li>`).join("");
+
+        document
+            .querySelectorAll(".controls button:not(#reset-button)")
+            .forEach((button) => {
+                button.disabled = !petState.isAlive;
+            });
     } else {
-        showMessage(`Connection problem (retry ${retryCount}/3)...`, "orange");
-        setTimeout(updateStatus, 2000 * retryCount);
+        authButtons.classList.remove("hidden");
+        logoutButton.classList.add("hidden");
+        container.classList.add("hidden");
     }
 }
 
-// Action bindings
+function getMoodMessage(pet) {
+    if (pet.hunger > 80) return "I'm starving!";
+    if (pet.happiness < 20) return "I'm so lonely...";
+    if (pet.energy < 20) return "I need to sleep...";
+    if (pet.happiness > 80) return "I love you!";
+    return "I'm feeling okay!";
+}
+
 const feed = () => sendAction("feed");
 const play = () => sendAction("play");
 const sleep = () => sendAction("sleep");
 const resetPet = () => sendAction("reset");
 
-// Initialize
 document.addEventListener("DOMContentLoaded", () => {
-    updateStatus();
+    const token = localStorage.getItem("token");
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            currentUser = payload.username;
+            updateStatus();
+        } catch (error) {
+            localStorage.removeItem("token");
+        }
+    }
+
     setInterval(() => {
-        if (document.visibilityState === "visible") updateStatus();
+        if (document.visibilityState === "visible" && currentUser) {
+            updateStatus();
+        }
     }, 5000);
 });

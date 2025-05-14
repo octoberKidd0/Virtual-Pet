@@ -2,23 +2,23 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const fs = require("fs");
+const path = require("path");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const app = express();
+const SECRET_KEY = "your-secure-key-123";
+const USERS_DIR = path.join(__dirname, "users");
 
-// Enhanced CORS configuration
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
-
+app.use(cors({ origin: true }));
 app.use(bodyParser.json());
 app.use(express.static("public"));
 
-// Pet management functions
+// Initialize users directory
+if (!fs.existsSync(USERS_DIR)) {
+  fs.mkdirSync(USERS_DIR);
+}
+
 function createNewPet() {
   return {
     name: "Pixel",
@@ -26,79 +26,137 @@ function createNewPet() {
     happiness: 50,
     energy: 50,
     isAlive: true,
+    achievements: {
+      feedCount: 0,
+      playCount: 0,
+      sleepCount: 0,
+      unlocked: [],
+    },
   };
 }
 
-function savePetData(petData) {
-  petData.isAlive =
-    petData.hunger < 100 && petData.happiness > 0 && petData.energy > 0;
-  fs.writeFileSync("pet.json", JSON.stringify(petData));
-}
+const authenticate = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
 
-// Initialize pet data
-let petData = createNewPet();
-
-if (fs.existsSync("pet.json")) {
   try {
-    const savedData = JSON.parse(fs.readFileSync("pet.json"));
-    petData = savedData.isAlive ? savedData : createNewPet();
-  } catch (e) {
-    console.error("Invalid pet data, creating new pet");
-    petData = createNewPet();
+    req.user = jwt.verify(token, SECRET_KEY);
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
   }
-} else {
-  savePetData(petData);
-}
+};
 
-// API Routes
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: Date.now() });
-});
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+  const userPath = path.join(USERS_DIR, `${username}.json`);
 
-app.get("/api/pet", (req, res) => {
-  res.json(petData);
-});
-
-const handlePetAction = (action) => {
-  if (!petData.isAlive) return;
-
-  switch (action) {
-    case "feed":
-      petData.hunger = Math.max(0, petData.hunger - 15);
-      petData.energy = Math.min(100, petData.energy + 5);
-      break;
-    case "play":
-      petData.happiness = Math.min(100, petData.happiness + 15);
-      petData.energy = Math.max(0, petData.energy - 10);
-      petData.hunger = Math.min(100, petData.hunger + 5);
-      break;
-    case "sleep":
-      petData.energy = Math.min(100, petData.energy + 30);
-      petData.hunger = Math.min(100, petData.hunger + 10);
-      break;
-    case "reset":
-      petData = createNewPet();
-      break;
+  if (fs.existsSync(userPath)) {
+    return res.status(400).json({ error: "Username exists" });
   }
 
-  savePetData(petData);
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const userData = {
+    username,
+    password: hashedPassword,
+    pet: createNewPet(),
+  };
+
+  fs.writeFileSync(userPath, JSON.stringify(userData));
+  res.status(201).json({ message: "User created" });
+});
+
+app.post("/api/login", async (req, res) => {
+  const { username, password } = req.body;
+  const userPath = path.join(USERS_DIR, `${username}.json`);
+
+  if (!fs.existsSync(userPath)) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const userData = JSON.parse(fs.readFileSync(userPath));
+  const valid = await bcrypt.compare(password, userData.password);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+  const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: "1h" });
+  res.json({ token, pet: userData.pet });
+});
+
+app.get("/api/pet", authenticate, (req, res) => {
+  const userPath = path.join(USERS_DIR, `${req.user.username}.json`);
+  const userData = JSON.parse(fs.readFileSync(userPath));
+  res.json(userData.pet);
+});
+
+const handlePetAction = (username, action) => {
+  const userPath = path.join(USERS_DIR, `${username}.json`);
+  const userData = JSON.parse(fs.readFileSync(userPath));
+  const { pet } = userData;
+
+  if (action === "reset") {
+    if (!pet.isAlive && !pet.achievements.unlocked.includes("Grim Reaper")) {
+      pet.achievements.unlocked.push("Grim Reaper");
+    }
+    userData.pet = createNewPet();
+  } else if (pet.isAlive) {
+    switch (action) {
+      case "feed":
+        pet.hunger = Math.max(0, pet.hunger - 15);
+        pet.energy = Math.min(100, pet.energy + 5);
+        pet.achievements.feedCount++;
+        break;
+      case "play":
+        pet.happiness = Math.min(100, pet.happiness + 15);
+        pet.energy = Math.max(0, pet.energy - 10);
+        pet.hunger = Math.min(100, pet.hunger + 5);
+        pet.achievements.playCount++;
+        break;
+      case "sleep":
+        pet.energy = Math.min(100, pet.energy + 30);
+        pet.hunger = Math.min(100, pet.hunger + 10);
+        pet.achievements.sleepCount++;
+        break;
+    }
+  }
+
+  pet.isAlive = pet.hunger < 100 && pet.happiness > 0 && pet.energy > 0;
+
+  const achievements = [
+    { condition: pet.achievements.feedCount >= 5, name: "Feeder Novice" },
+    { condition: pet.achievements.playCount >= 5, name: "Playtime Pro" },
+    { condition: pet.achievements.sleepCount >= 5, name: "Sleep Expert" },
+    { condition: !pet.isAlive, name: "Grim Reaper" },
+  ];
+
+  achievements.forEach(({ condition, name }) => {
+    if (condition && !pet.achievements.unlocked.includes(name)) {
+      pet.achievements.unlocked.push(name);
+    }
+  });
+
+  fs.writeFileSync(userPath, JSON.stringify(userData));
+  return userData.pet;
 };
 
 ["feed", "play", "sleep", "reset"].forEach((action) => {
-  app.post(`/api/${action}`, (req, res) => {
-    handlePetAction(action);
-    res.json(petData);
+  app.post(`/api/${action}`, authenticate, (req, res) => {
+    const pet = handlePetAction(req.user.username, action);
+    res.json(pet);
   });
 });
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error("Server error:", err);
-  res.status(500).json({ error: "Internal server error" });
-});
+setInterval(() => {
+  fs.readdirSync(USERS_DIR).forEach((file) => {
+    const userPath = path.join(USERS_DIR, file);
+    const userData = JSON.parse(fs.readFileSync(userPath));
+    if (userData.pet.isAlive) {
+      userData.pet.hunger = Math.min(100, userData.pet.hunger + 2);
+      userData.pet.happiness = Math.max(0, userData.pet.happiness - 1);
+      userData.pet.energy = Math.max(0, userData.pet.energy - 1);
+      handlePetAction(userData.username, "auto-update");
+    }
+  });
+}, 300000);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  savePetData(petData); // Ensure initial file exists
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
