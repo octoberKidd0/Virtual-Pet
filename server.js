@@ -19,9 +19,9 @@ if (!fs.existsSync(USERS_DIR)) {
   fs.mkdirSync(USERS_DIR);
 }
 
-function createNewPet() {
+function createNewPet(petName = "Pixel") {
   return {
-    name: "Pixel",
+    name: petName,
     hunger: 50,
     happiness: 50,
     energy: 50,
@@ -48,7 +48,7 @@ const authenticate = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, petName } = req.body;
   const userPath = path.join(USERS_DIR, `${username}.json`);
 
   if (fs.existsSync(userPath)) {
@@ -59,7 +59,7 @@ app.post("/api/register", async (req, res) => {
   const userData = {
     username,
     password: hashedPassword,
-    pet: createNewPet(),
+    pet: createNewPet(petName),
   };
 
   fs.writeFileSync(userPath, JSON.stringify(userData));
@@ -97,7 +97,7 @@ const handlePetAction = (username, action) => {
     if (!pet.isAlive && !pet.achievements.unlocked.includes("Grim Reaper")) {
       pet.achievements.unlocked.push("Grim Reaper");
     }
-    userData.pet = createNewPet();
+    userData.pet = createNewPet(pet.name);
   } else if (pet.isAlive) {
     switch (action) {
       case "feed":

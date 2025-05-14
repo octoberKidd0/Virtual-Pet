@@ -5,13 +5,15 @@ const API_BASE = "/api";
 async function register() {
     const username = prompt("Enter username:");
     const password = prompt("Enter password:");
+    const petName = prompt("Name your pet:", "Pixel");
+
     if (!username || !password) return;
 
     try {
         const response = await fetch(`${API_BASE}/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username, password, petName }),
         });
 
         if (response.ok) {
@@ -104,15 +106,17 @@ async function sendAction(action) {
 }
 
 function updateUI() {
-    const authButtons = document.querySelector(".auth-buttons");
+    const authSection = document.getElementById("auth-section");
+    const petSection = document.getElementById("pet-section");
     const logoutButton = document.getElementById("logout-button");
-    const container = document.querySelector(".container");
 
     if (currentUser && petState) {
-        authButtons.classList.add("hidden");
-        logoutButton.classList.remove("hidden");
-        container.classList.remove("hidden");
+        authSection.style.display = "none";
+        petSection.style.display = "block";
+        logoutButton.style.display = "block";
 
+        document.getElementById("user-title").textContent =
+            `${currentUser}'s Pet`;
         document.getElementById("pet-name").textContent = petState.name;
         document.getElementById("hunger").textContent = petState.hunger;
         document.getElementById("happiness").textContent = petState.happiness;
@@ -133,9 +137,9 @@ function updateUI() {
                 button.disabled = !petState.isAlive;
             });
     } else {
-        authButtons.classList.remove("hidden");
-        logoutButton.classList.add("hidden");
-        container.classList.add("hidden");
+        authSection.style.display = "flex";
+        petSection.style.display = "none";
+        logoutButton.style.display = "none";
     }
 }
 

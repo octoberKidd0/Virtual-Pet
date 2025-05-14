@@ -5,19 +5,18 @@
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <div class="auth-buttons">
+        <div id="auth-section">
             <button onclick="login()">Login</button>
             <button onclick="register()">Register</button>
         </div>
 
-        <button id="logout-button" class="hidden" onclick="logout()">
-            Logout
-        </button>
+        <button id="logout-button" onclick="logout()">Logout</button>
 
-        <div class="container hidden">
+        <div id="pet-section" class="container">
+            <h2 id="user-title"></h2>
             <div class="pet-status">
                 <div id="pet-display">🐶</div>
-                <h2 id="pet-name"></h2>
+                <h3 id="pet-name"></h3>
                 <div class="stats">
                     <div>Hunger: <span id="hunger"></span></div>
                     <div>Happiness: <span id="happiness"></span></div>
